@@ -23,3 +23,18 @@ Usage of or:
   -u string
     	single URL to test (can contain placeholder)
 ```
+## Installations
+```
+go install -v github.com/h6nt3r/or@latest
+```
+## Build binary
+```
+git clone https://github.com/h6nt3r/or.git
+cd or
+go mod init main.go
+go mod tidy
+go build -o or main.go
+sudo mv or /usr/local/bin/
+cd
+or -h
+```
