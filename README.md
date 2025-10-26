@@ -3,25 +3,20 @@
 ## Options:
 ```
 or -h  
-Open Redirect Checker. Current version 0.0.1
+Open Redirect Checker. Current version 0.0.2
 Developed by github.com/h6nt3r
 
-Usage of or:
-  -c int
-    	concurrency (number of workers) (default 5)
-  -d	enable debug logging (default: false)
-  -f string
-    	file with URLs (one per line)
-  -o string
-    	output file (plain text). if empty prints to stdout
-  -p string
-    	payloads file (one per line) (default "payloads.txt")
-  -pl string
-    	placeholder text in URL (default: OREDIR) (default "OREDIR")
-  -t int
-    	per-request timeout in seconds (default 10)
-  -u string
-    	single URL to test (can contain placeholder)
+Usage: open-redirect-checker [options]
+
+Options:
+  -u string       Single URL to test (can contain placeholder)
+  -f string       File with URLs (one per line)
+  -p string       Payloads file (one per line) (default "payloads.txt")
+  -pl string      Placeholder text in URL (default "OREDIR")
+  -t int          Per-request timeout in seconds (default 10)
+  -c int          Thread concurrency number of workers (default 5)
+  -d              Enable debug logging (default: false)
+  -o string       Output file (plain text)
 ```
 ## Installations
 ```
