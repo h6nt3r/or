@@ -39,20 +39,36 @@ import (
 
 func main() {
     // Print banner
-    fmt.Println("Open Redirect Checker. Current version 0.0.1")
+    fmt.Println("Open Redirect Checker. Current version 0.0.2")
     fmt.Println("Developed by github.com/h6nt3r")
     fmt.Println()
 
+    // Define flags
     flagURL := flag.String("u", "", "single URL to test (can contain placeholder)")
     flagFile := flag.String("f", "", "file with URLs (one per line)")
     flagPayloads := flag.String("p", "payloads.txt", "payloads file (one per line)")
     flagPlaceholder := flag.String("pl", "OREDIR", "placeholder text in URL (default: OREDIR)")
     flagTimeout := flag.Int("t", 10, "per-request timeout in seconds")
-    flagThreads := flag.Int("c", 5, "concurrency (number of workers)")
+    flagThreads := flag.Int("c", 5, "thread concurrency number of workers")
     flagDebug := flag.Bool("d", false, "enable debug logging (default: false)")
-    flagOutput := flag.String("o", "", "output file (plain text). if empty prints to stdout")
+    flagOutput := flag.String("o", "", "output file (plain text)")
+
+    // ✅ Custom help menu
+    flag.Usage = func() {
+        fmt.Println("Usage: open-redirect-checker [options]")
+        fmt.Println("\nOptions:")
+        fmt.Println("  -u string       Single URL to test (can contain placeholder)")
+        fmt.Println("  -f string       File with URLs (one per line)")
+        fmt.Println("  -p string       Payloads file (one per line) (default \"payloads.txt\")")
+        fmt.Println("  -pl string      Placeholder text in URL (default \"OREDIR\")")
+        fmt.Println("  -t int          Per-request timeout in seconds (default 10)")
+        fmt.Println("  -c int          Thread concurrency number of workers (default 5)")
+        fmt.Println("  -d              Enable debug logging (default: false)")
+        fmt.Println("  -o string       Output file (plain text)")
+    }
 
     flag.Parse()
+
 
     var urls []string
     // Check if input is coming from stdin (piping)
@@ -259,24 +275,37 @@ func readLines(path string) ([]string, error) {
 }
 
 func buildInjectedURL(rawURL, payload, placeholder string) (string, string) {
+    // যদি rawURL-এ placeholder থাকে → সবগুলো placeholder প্রতিস্থাপন করবে
     if strings.Contains(rawURL, placeholder) {
-        // Decode payload to handle encoded characters before injection
-        decodedPayload, _ := url.QueryUnescape(payload)
-        if decodedPayload == "" {
-            decodedPayload = payload
-        }
         tested := strings.ReplaceAll(rawURL, placeholder, payload)
+        // চেষ্টা করে কিউরি থেকে কোন প্যারামিটার ছিলো সেটা বের করবে (নাহলে "") 
         param := findParamNameForPlaceholder(rawURL, placeholder)
-        if param == "" {
-            param = "p"
-        }
         return tested, param
     }
-    if strings.Contains(rawURL, "?") {
-        return rawURL + "&p=" + url.QueryEscape(payload), "p"
+
+    // placeholder পাওয়া যায়নি — এবার দেখে নাও URL-এ query params আছে কি না
+    u, err := url.Parse(rawURL)
+    if err != nil {
+        // parse না হলে কেবল original রাখো এবং খালি param পাঠাও
+        return rawURL, ""
     }
-    return rawURL + "?p=" + url.QueryEscape(payload), "p"
+
+    // যদি কোন query parameter থাকে → প্রতিটি parameter-এর value payload দিয়ে সেট করো
+    q := u.Query()
+    if len(q) > 0 {
+        var keys []string
+        for k := range q {
+            q.Set(k, payload) // value as raw; Encode() will percent-encode as needed
+            keys = append(keys, k)
+        }
+        u.RawQuery = q.Encode()
+        return u.String(), strings.Join(keys, ",")
+    }
+
+    // placeholder নেই এবং কোন query parameter-ও নেই -> কোন পরিবর্তন না করে ফেরা
+    return rawURL, ""
 }
+
 
 func findParamNameForPlaceholder(rawURL, placeholder string) string {
     u, err := url.Parse(rawURL)
@@ -578,20 +607,20 @@ func normalizeForMatch(s string) string {
 }
 
 func writePlainLine(w *bufio.Writer, current, total int64, testedURL, injectedParam, payload string, status int, locationRaw, result string) {
-    fileLine := fmt.Sprintf("%s(%d/%d): %s", result, current, total, testedURL)
-    if locationRaw != "" && locationRaw != "-" && result == "Redirect Found" {
-        fileLine += fmt.Sprintf(" Location: %s", locationRaw)
+    // ✅ শুধু Redirect Found হলে ফাইল আউটপুটে শুধু URL লিখবে (Location বাদ)
+    if result == "Redirect Found" {
+        _, _ = w.WriteString(fmt.Sprintf("%s\n", testedURL))
+        _ = w.Flush()
     }
-    fileLine += "\n"
-    _, _ = w.WriteString(fileLine)
-    _ = w.Flush()
 
+    // 🎨 টার্মিনালে আগের মতো রঙসহ দেখাবে
     const red = "\x1b[31m"
     const reset = "\x1b[0m"
     termURL := testedURL
     if result == "Redirect Found" {
         termURL = red + testedURL + reset
     }
+
     termLine := fmt.Sprintf("%s(%d/%d): %s", result, current, total, termURL)
     if locationRaw != "" && locationRaw != "-" && result == "Redirect Found" {
         termLine += fmt.Sprintf(" Location: %s", locationRaw)
